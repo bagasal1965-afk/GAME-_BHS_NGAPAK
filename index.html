@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>bgas-run & Jump - Neon Endless Runner</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        rajdhani: ['Rajdhani', 'sans-serif'],
+                    },
+                    colors: {
+                        neonCyan: '#00f3ff',
+                        neonPink: '#ff0055',
+                        neonPurple: '#b000ff',
+                        neonYellow: '#ffea00',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #050510;
+        }
+
+        /* Glowing Neon Effects */
+        .text-glow-cyan { text-shadow: 0 0 8px #00f3ff, 0 0 20px #00f3ff; }
+        .text-glow-pink { text-shadow: 0 0 8px #ff0055, 0 0 20px #ff0055; }
+        .box-glow-cyan { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.2); }
+        .box-glow-pink { box-shadow: 0 0 15px rgba(255, 0, 85, 0.4), inset 0 0 15px rgba(255, 0, 85, 0.2); }
+        
+        /* Custom Button Styling */
+        .btn-cyber {
+            position: relative;
+            clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+            transition: all 0.2s ease;
+        }
+        .btn-cyber:active {
+            transform: scale(0.96);
+        }
+
+        /* Scanline Overlay Effect */
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body class="font-rajdhani text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden select-none bg-slate-950">
+
+    <!-- Top Status Header -->
+    <header class="w-full max-w-5xl mx-auto p-3 sm:p-4 flex items-center justify-between z-10 border-b border-cyan-500/20 bg-slate-900/60 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 box-glow-cyan">
+                <i class="fa-solid fa-person-running text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-orbitron font-black text-lg sm:text-xl tracking-wider text-cyan-400 text-glow-cyan leading-none">CYBER RUN</h1>
+                <p class="text-[10px] sm:text-xs text-pink-400 font-mono tracking-widest">bagassv2.0</p>
+            </div>
+        </div>
+
+        <!-- High score & Orbs stats header -->
+        <div class="flex items-center gap-4 text-xs sm:text-sm font-orbitron">
+            <div class="flex items-center gap-1.5 bg-slate-900/80 border border-yellow-500/30 px-3 py-1.5 rounded-lg text-yellow-400">
+                <i class="fa-solid fa-bolt text-yellow-400"></i>
+                <span id="header-orbs">0</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900/80 border border-pink-500/30 px-3 py-1.5 rounded-lg text-pink-400">
+                <i class="fa-solid fa-trophy"></i>
+                <span id="header-highscore">0</span>m
+            </div>
+            <button id="btn-sound-toggle" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg flex items-center justify-center text-slate-300">
+                <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Game Viewport Container -->
+    <main class="flex-1 w-full max-w-5xl mx-auto relative flex items-center justify-center p-2 sm:p-4 my-auto">
+        <div id="game-container" class="relative w-full aspect-[16/9] max-h-[75vh] bg-black rounded-2xl overflow-hidden border-2 border-cyan-500/40 shadow-2xl shadow-cyan-950/50 box-glow-cyan">
+            
+            <!-- Canvas -->
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- Scanline FX overlay -->
+            <div class="scanlines absolute inset-0 pointer-events-none opacity-40"></div>
+
+            <!-- In-Game HUD Overlay -->
+            <div id="hud-overlay" class="absolute inset-x-0 top-0 p-4 flex justify-between items-start pointer-events-none opacity-0 transition-opacity duration-300">
+                <!-- Score & Multiplier -->
+                <div class="bg-slate-950/80 backdrop-blur-md border border-cyan-500/30 p-2.5 px-4 rounded-xl flex flex-col gap-0.5">
+                    <span class="text-[10px] text-cyan-400 font-mono tracking-wider">DISTANCE</span>
+                    <span id="hud-score" class="font-orbitron text-2xl font-black text-white text-glow-cyan">0m</span>
+                </div>
+
+                <!-- Active Powerup Badges -->
+                <div id="hud-powerups" class="flex gap-2">
+                    <!-- Powerup items dynamically added here -->
+                </div>
+
+                <!-- Pause Button -->
+                <button id="btn-pause" class="pointer-events-auto w-10 h-10 bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 rounded-xl flex items-center justify-center transition active:scale-95">
+                    <i class="fa-solid fa-pause"></i>
+                </button>
+            </div>
+
+            <!-- MENU: START SCREEN -->
+            <div id="menu-start" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+                <div class="mb-6">
+                    <h2 class="font-orbitron text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400 text-glow-cyan mb-2">CYBER RUN & JUMP</h2>
+                    <p class="text-xs sm:text-sm text-cyan-300/80 font-mono tracking-widest">GERAKAN PARKAUR KIE JOSJIS</p>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 w-full max-w-xs mb-8">
+                    <button id="btn-start" class="btn-cyber w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-orbitron font-black text-lg tracking-wider shadow-lg shadow-cyan-500/30">
+                        <i class="fa-solid fa-play mr-2"></i> LANGSUNG BAE MULAI
+                    </button>
+                    <button id="btn-shop" class="btn-cyber w-full py-3.5 bg-slate-900 hover:bg-slate-800 border border-pink-500/50 text-pink-400 font-orbitron font-bold text-base tracking-wider box-glow-pink">
+                        <i class="fa-solid fa-store mr-2"></i> WARUNG CIHUYY
+                    </button>
+                </div>
+
+                <!-- How to play instructions -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 max-w-md w-full text-xs text-slate-400">
+                    <p class="font-bold text-cyan-400 mb-1.5 font-orbitron"><i class="fa-solid fa-keyboard mr-1"></i> NGGO NGONTROL/p>
+                    <div class="grid grid-cols-2 gap-2 text-left">
+                        <div class="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                            <span class="text-white font-semibold block">LONCAT / LONCAT PING LORO:</span>
+                            <span class="text-pink-400">Panah Atas / Space / Tap</span>
+                        </div>
+                        <div class="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                            <span class="text-white font-semibold block">MENTUNGKUL (Slide):</span>
+                            <span class="text-cyan-400">Panah  NGISOR/ Hold Button</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MENU: GAME OVER SCREEN -->
+            <div id="menu-gameover" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 hidden">
+                <h2 class="font-orbitron text-3xl sm:text-4xl font-black text-pink-500 text-glow-pink mb-1">WKWK KALAHAN MEN SIEH</h2>
+                <p class="text-xs text-slate-400 font-mono mb-6">LANGSUNG MAIN MANING AJA SUREN</p>
+
+                <!-- Final Stats Card -->
+                <div class="bg-slate-900/90 border border-pink-500/30 rounded-2xl p-5 max-w-sm w-full mb-6 box-glow-pink">
+                    <div class="grid grid-cols-2 gap-4 divide-x divide-slate-800">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-mono block">JARAKE KOEN</span>
+                            <span id="go-score" class="font-orbitron text-2xl font-bold text-cyan-400">0m</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-mono block">BINTANG POINT </span>
+                            <span id="go-orbs" class="font-orbitron text-2xl font-bold text-yellow-400">+0</span>
+                        </div>
+                    </div>
+                    <div id="go-new-highscore" class="mt-4 pt-3 border-t border-slate-800/80 text-pink-400 font-orbitron text-xs font-bold hidden animate-pulse">
+                        <i class="fa-solid fa-crown mr-1"></i> BEREESSSSSSSSSSSSS MEN AHK!
+                    </div>
+                </div>
+
+                <div class="flex gap-3 w-full max-w-xs">
+                    <button id="btn-restart" class="btn-cyber flex-1 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-orbitron font-bold text-sm tracking-wider shadow-lg shadow-pink-500/30">
+                        <i class="fa-solid fa-rotate-right mr-1.5"></i> DULANGI?
+                    </button>
+                    <button id="btn-menu-go" class="btn-cyber px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-orbitron font-bold text-sm">
+                        <i class="fa-solid fa-house"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- MENU: PAUSE SCREEN -->
+            <div id="menu-pause" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 hidden">
+                <h2 class="font-orbitron text-3xl font-black text-cyan-400 text-glow-cyan mb-6">SYSTEM GEM E</h2>
+                <div class="flex flex-col gap-3 w-full max-w-xs">
+                    <button id="btn-resume" class="btn-cyber w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-orbitron font-bold text-sm">
+                        <i class="fa-solid fa-play mr-2"></i> LANJUT BAE
+                    </button>
+                    <button id="btn-quit" class="btn-cyber w-full py-3 bg-slate-800 hover:bg-slate-700 text-pink-400 border border-pink-500/30 font-orbitron font-bold text-sm">
+                        <i class="fa-solid fa-right-from-bracket mr-2"></i> METU BAE LAH
+                    </button>
+                </div>
+            </div>
+
+            <!-- MENU: CYBER SHOP -->
+            <div id="menu-shop" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col p-6 z-20 hidden">
+                <div class="flex justify-between items-center mb-6 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-store text-pink-500 text-xl"></i>
+                        <h2 class="font-orbitron text-xl font-bold text-white">TOKO SERBA TIGALIMA</h2>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1.5 bg-slate-900 border border-yellow-500/30 px-3 py-1 rounded-lg text-yellow-400 text-xs font-orbitron">
+                            <i class="fa-solid fa-bolt"></i> <span id="shop-orbs-count">0</span>
+                        </div>
+                        <button id="btn-close-shop" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Skins Grid -->
+                <div id="shop-skins-list" class="grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-y-auto pr-1 flex-1">
+                    <!-- Dynamic Skins generated by JS -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Mobile Touch Controls Footer (Only visible on small touch screens) -->
+    <footer id="touch-controls" class="w-full max-w-5xl mx-auto p-3 grid grid-cols-2 gap-4 sm:hidden">
+        <button id="touch-slide" class="py-4 bg-slate-900 border-2 border-cyan-500/50 rounded-xl text-cyan-400 font-orbitron font-bold text-sm active:bg-cyan-950/60 transition flex items-center justify-center gap-2 box-glow-cyan">
+            <i class="fa-solid fa-arrow-down"></i> MGISOR
+        </button>
+        <button id="touch-jump" class="py-4 bg-slate-900 border-2 border-pink-500/50 rounded-xl text-pink-400 font-orbitron font-bold text-sm active:bg-pink-950/60 transition flex items-center justify-center gap-2 box-glow-pink">
+            <i class="fa-solid fa-arrow-up"></i> JUMP / DOUBLE LONCAT
+        </button>
+    </footer>
+
+    <!-- Game Engine Logic Script -->
+    <script>
+        // --- SOUND EFFECTS SYNTHESIZER (WEB AUDIO API) ---
+        const SoundFX = {
+            ctx: null,
+            enabled: true,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playJump() {
+                if (!this.enabled) return; this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+            },
+            playOrb() {
+                if (!this.enabled) return; this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(1200, this.ctx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.12);
+            },
+            playPowerup() {
+                if (!this.enabled) return; this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(800, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+            },
+            playHit() {
+                if (!this.enabled) return; this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            }
+        };
+
+        // --- SKINS DATABASE ---
+        const SKINS = [
+            { id: 'cyan', name: 'GIOK BIRU', color: '#00f3ff', trail: '#0088ff', price: 0, unlocked: true },
+            { id: 'pink', name: 'WATU AKIK', color: '#ff0055', trail: '#ff00aa', price: 100, unlocked: false },
+            { id: 'yellow', name: 'WATU PERMATA EMAS', color: '#ffea00', trail: '#ff8800', price: 250, unlocked: false },
+            { id: 'purple', name: 'GIOK KAISAR UNGUWW', color: '#b000ff', trail: '#7700ff', price: 500, unlocked: false },
+        ];
+
+        // --- GAME ENGINE STATE & CONFIG ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START'; // START, PLAYING, PAUSED, GAMEOVER
+        let score = 0;
+        let highscore = parseInt(localStorage.getItem('cyber_highscore')) || 0;
+        let totalOrbs = parseInt(localStorage.getItem('cyber_orbs')) || 0;
+        let activeSkin = localStorage.getItem('cyber_skin') || 'cyan';
+        let unlockedSkins = JSON.parse(localStorage.getItem('cyber_unlocked_skins')) || ['cyan'];
+
+        let gameSpeed = 6;
+        const BASE_SPEED = 6;
+        let distanceCount = 0;
+
+        // Canvas Scale Helper
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Player Object
+        const player = {
+            x: 80,
+            y: 0,
+            width: 32,
+            height: 52,
+            velocityY: 0,
+            gravity: 0.65,
+            jumpForce: -12.5,
+            isGrounded: false,
+            jumpCount: 0,
+            maxJumps: 2,
+            isSliding: false,
+            normalHeight: 52,
+            slideHeight: 26,
+            trailHistory: [],
+            shield: false,
+            magnet: false,
+            speedBoost: false,
+            boostTimer: 0,
+            shieldTimer: 0,
+            magnetTimer: 0,
+
+            reset() {
+                this.y = canvas.height - 80 - this.height;
+                this.velocityY = 0;
+                this.isGrounded = true;
+                this.jumpCount = 0;
+                this.isSliding = false;
+                this.height = this.normalHeight;
+                this.shield = false;
+                this.magnet = false;
+                this.speedBoost = false;
+                this.boostTimer = 0;
+                this.shieldTimer = 0;
+                this.magnetTimer = 0;
+                this.trailHistory = [];
+            },
+
+            jump() {
+                if (this.jumpCount < this.maxJumps) {
+                    if (this.isSliding) this.stopSlide();
+                    this.velocityY = this.jumpForce;
+                    this.jumpCount++;
+                    this.isGrounded = false;
+                    SoundFX.playJump();
+                    createParticles(this.x + this.width / 2, this.y + this.height, '#00f3ff', 8);
+                }
+            },
+
+            startSlide() {
+                if (!this.isSliding && this.isGrounded) {
+                    this.isSliding = true;
+                    this.height = this.slideHeight;
+                    this.y += (this.normalHeight - this.slideHeight);
+                }
+            },
+
+            stopSlide() {
+                if (this.isSliding) {
+                    this.isSliding = false;
+                    this.y -= (this.normalHeight - this.slideHeight);
+                    this.height = this.normalHeight;
+                }
+            },
+
+            update() {
+                // Gravity physics
+                this.velocityY += this.gravity;
+                this.y += this.velocityY;
+
+                const groundY = canvas.height - 50 - this.height;
+                if (this.y >= groundY) {
+                    this.y = groundY;
+                    this.velocityY = 0;
+                    this.isGrounded = true;
+                    this.jumpCount = 0;
+                }
+
+                // Powerup Timers
+                if (this.speedBoost) {
+                    this.boostTimer--;
+                    if (this.boostTimer <= 0) this.speedBoost = false;
+                }
+                if (this.shield) {
+                    this.shieldTimer--;
+                    if (this.shieldTimer <= 0) this.shield = false;
+                }
+                if (this.magnet) {
+                    this.magnetTimer--;
+                    if (this.magnetTimer <= 0) this.magnet = false;
+                }
+
+                // Trail Effect Record
+                this.trailHistory.push({ x: this.x, y: this.y, w: this.width, h: this.height });
+                if (this.trailHistory.length > 8) this.trailHistory.shift();
+            },
+
+            draw() {
+                const skinObj = SKINS.find(s => s.id === activeSkin) || SKINS[0];
+
+                // Draw Motion Trail
+                this.trailHistory.forEach((t, i) => {
+                    ctx.fillStyle = skinObj.trail;
+                    ctx.globalAlpha = (i / this.trailHistory.length) * 0.3;
+                    ctx.fillRect(t.x - (this.trailHistory.length - i) * 2, t.y, t.w, t.h);
+                });
+                ctx.globalAlpha = 1.0;
+
+                // Shield Effect
+                if (this.shield) {
+                    ctx.strokeStyle = '#00f3ff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Main Character Rect (Neon Cyber Runner)
+                ctx.fillStyle = skinObj.color;
+                ctx.shadowColor = skinObj.color;
+                ctx.shadowBlur = 12;
+                
+                // Rounded Cyberpunk Body
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.width, this.height, 6);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Runner Visor
+                ctx.fillStyle = '#ffffff';
+                if (!this.isSliding) {
+                    ctx.fillRect(this.x + this.width - 12, this.y + 10, 10, 6);
+                } else {
+                    ctx.fillRect(this.x + this.width - 12, this.y + 6, 10, 6);
+                }
+            }
+        };
+
+        // --- GAME OBJECTS & ARRAYS ---
+        let obstacles = [];
+        let items = [];
+        let particles = [];
+        let backgroundBuildings = [];
+
+        // Parallax Background Setup
+        function initBackground() {
+            backgroundBuildings = [];
+            let bgX = 0;
+            while (bgX < canvas.width + 200) {
+                const width = 40 + Math.random() * 60;
+                const height = 100 + Math.random() * 200;
+                backgroundBuildings.push({ x: bgX, width, height, color: '#0d1127' });
+                bgX += width + 10;
+            }
+        }
+
+        // Particle System
+        function createParticles(x, y, color, count = 5) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    color,
+                    size: 2 + Math.random() * 3,
+                    life: 20 + Math.random() * 10
+                });
+            }
+        }
+
+        // Spawning Logic
+        let spawnTimer = 0;
+        function spawnEntities() {
+            spawnTimer++;
+            if (spawnTimer > Math.max(50, 110 - Math.floor(distanceCount / 30))) {
+                spawnTimer = 0;
+                const rand = Math.random();
+
+                // Spawn Obstacle types
+                if (rand < 0.45) {
+                    // Low hurdle (Jump over)
+                    obstacles.push({
+                        x: canvas.width + 50,
+                        y: canvas.height - 50 - 35,
+                        width: 25 + Math.random() * 15,
+                        height: 35,
+                        type: 'LOW_BARRIER'
+                    });
+                } else if (rand < 0.75) {
+                    // High Drone (Slide under)
+                    obstacles.push({
+                        x: canvas.width + 50,
+                        y: canvas.height - 50 - 85,
+                        width: 40,
+                        height: 30,
+                        type: 'HIGH_DRONE'
+                    });
+                } else {
+                    // High Laser Wall
+                    obstacles.push({
+                        x: canvas.width + 50,
+                        y: canvas.height - 50 - 65,
+                        width: 20,
+                        height: 65,
+                        type: 'TALL_WALL'
+                    });
+                }
+
+                // Spawn Energy Orbs / Powerups
+                if (Math.random() < 0.6) {
+                    const itemType = Math.random() < 0.85 ? 'ORB' : (Math.random() < 0.5 ? 'SHIELD' : 'MAGNET');
+                    items.push({
+                        x: canvas.width + 100,
+                        y: canvas.height - 120 - Math.random() * 80,
+                        size: 16,
+                        type: itemType
+                    });
+                }
+            }
+        }
+
+        // --- UPDATE GAME LOOP LOGIC ---
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // Speed calculation
+            const currentSpeed = player.speedBoost ? gameSpeed * 1.5 : gameSpeed;
+            distanceCount += currentSpeed * 0.02;
+            score = Math.floor(distanceCount);
+
+            player.update();
+
+            // Parallax Buildings
+            backgroundBuildings.forEach(b => {
+                b.x -= currentSpeed * 0.2;
+                if (b.x + b.width < 0) {
+                    b.x = canvas.width + Math.random() * 20;
+                    b.height = 100 + Math.random() * 200;
+                }
+            });
+
+            // Update Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.x -= currentSpeed;
+
+                // Collision Detection with Player
+                if (
+                    player.x < obs.x + obs.width &&
+                    player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height &&
+                    player.y + player.height > obs.y
+                ) {
+                    if (player.shield) {
+                        // Shield absorbs hit
+                        player.shield = false;
+                        createParticles(obs.x, obs.y, '#00f3ff', 15);
+                        obstacles.splice(i, 1);
+                        SoundFX.playHit();
+                    } else {
+                        // Game Over
+                        triggerGameOver();
+                        return;
+                    }
+                }
+
+                // Remove offscreen
+                if (obs.x + obs.width < 0) obstacles.splice(i, 1);
+            }
+
+            // Update Items (Orbs / Powerups)
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+
+                // Magnet logic
+                if (player.magnet) {
+                    const dx = (player.x + player.width / 2) - item.x;
+                    const dy = (player.y + player.height / 2) - item.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 180) {
+                        item.x += (dx / dist) * 8;
+                        item.y += (dy / dist) * 8;
+                    }
+                }
+
+                item.x -= currentSpeed;
+
+                // Pickup Detection
+                if (
+                    player.x < item.x + item.size &&
+                    player.x + player.width > item.x &&
+                    player.y < item.y + item.size &&
+                    player.y + player.height > item.y
+                ) {
+                    if (item.type === 'ORB') {
+                        totalOrbs++;
+                        SoundFX.playOrb();
+                        createParticles(item.x, item.y, '#ffea00', 6);
+                    } else if (item.type === 'SHIELD') {
+                        player.shield = true;
+                        player.shieldTimer = 300;
+                        SoundFX.playPowerup();
+                    } else if (item.type === 'MAGNET') {
+                        player.magnet = true;
+                        player.magnetTimer = 350;
+                        SoundFX.playPowerup();
+                    }
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                if (item.x + item.size < 0) items.splice(i, 1);
+            }
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Gradually increase base game speed
+            gameSpeed = BASE_SPEED + (distanceCount / 150);
+
+            spawnEntities();
+            updateHUD();
+        }
+
+        // --- DRAW GAME CANVAS ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Synthwave Grid Sky Background
+            ctx.fillStyle = '#050515';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Parallax City Skyline
+            backgroundBuildings.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, canvas.height - 50 - b.height, b.width, b.height);
+                // Glowing roofline
+                ctx.fillStyle = '#ff0055';
+                ctx.fillRect(b.x, canvas.height - 50 - b.height, b.width, 2);
+            });
+
+            // Ground Floor (Neon Synth Track)
+            const groundY = canvas.height - 50;
+            ctx.fillStyle = '#0a0a24';
+            ctx.fillRect(0, groundY, canvas.width, 50);
+
+            // Ground Neon Line
+            ctx.shadowColor = '#00f3ff';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Ground Perspective Grid Lines
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+            ctx.lineWidth = 1;
+            const gridOffset = (distanceCount * 10) % 30;
+            for (let x = -gridOffset; x < canvas.width; x += 30) {
+                ctx.beginPath();
+                ctx.moveTo(x, groundY);
+                ctx.lineTo(x - 20, canvas.height);
+                ctx.stroke();
+            }
+
+            // 2. Draw Obstacles
+            obstacles.forEach(obs => {
+                if (obs.type === 'LOW_BARRIER') {
+                    ctx.fillStyle = '#ff0055';
+                    ctx.shadowColor = '#ff0055';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                } else if (obs.type === 'HIGH_DRONE') {
+                    ctx.fillStyle = '#ffea00';
+                    ctx.shadowColor = '#ffea00';
+                    ctx.shadowBlur = 8;
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    // Drone eye
+                    ctx.fillStyle = '#ff0055';
+                    ctx.fillRect(obs.x + 8, obs.y + 10, obs.width - 16, 8);
+                } else { // TALL WALL
+                    ctx.fillStyle = '#b000ff';
+                    ctx.shadowColor = '#b000ff';
+                    ctx.shadowBlur = 12;
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                }
+                ctx.shadowBlur = 0;
+            });
+
+            // 3. Draw Items (Orbs & Powerups)
+            items.forEach(item => {
+                ctx.beginPath();
+                if (item.type === 'ORB') {
+                    ctx.fillStyle = '#ffea00';
+                    ctx.shadowColor = '#ffea00';
+                    ctx.shadowBlur = 8;
+                    ctx.arc(item.x, item.y, item.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (item.type === 'SHIELD') {
+                    ctx.fillStyle = '#00f3ff';
+                    ctx.shadowColor = '#00f3ff';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(item.x - 8, item.y - 8, 16, 16);
+                } else if (item.type === 'MAGNET') {
+                    ctx.fillStyle = '#ff0055';
+                    ctx.shadowColor = '#ff0055';
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(item.x - 8, item.y - 8, 16, 16);
+                }
+                ctx.shadowBlur = 0;
+            });
+
+            // 4. Draw Player
+            player.draw();
+
+            // 5. Draw Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+        }
+
+        // Main Loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- HUD & UI UPDATES ---
+        function updateHUD() {
+            document.getElementById('hud-score').textContent = score + 'm';
+            document.getElementById('header-orbs').textContent = totalOrbs;
+            document.getElementById('header-highscore').textContent = highscore;
+
+            // Render Active Powerup Badges
+            const container = document.getElementById('hud-powerups');
+            container.innerHTML = '';
+            if (player.shield) {
+                container.innerHTML += `<div class="bg-cyan-500/20 border border-cyan-400 text-cyan-400 text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 font-orbitron"><i class="fa-solid fa-shield-halved"></i> SHIELD</div>`;
+            }
+            if (player.magnet) {
+                container.innerHTML += `<div class="bg-pink-500/20 border border-pink-400 text-pink-400 text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 font-orbitron"><i class="fa-solid fa-magnet"></i> MAGNET</div>`;
+            }
+        }
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            SoundFX.playHit();
+
+            let isNewHigh = false;
+            if (score > highscore) {
+                highscore = score;
+                localStorage.setItem('cyber_highscore', highscore);
+                isNewHigh = true;
+            }
+            localStorage.setItem('cyber_orbs', totalOrbs);
+
+            document.getElementById('go-score').textContent = score + 'm';
+            document.getElementById('go-orbs').textContent = '+' + totalOrbs;
+            document.getElementById('go-new-highscore').classList.toggle('hidden', !isNewHigh);
+
+            document.getElementById('hud-overlay').classList.add('opacity-0');
+            document.getElementById('menu-gameover').classList.remove('hidden');
+        }
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            distanceCount = 0;
+            gameSpeed = BASE_SPEED;
+            obstacles = [];
+            items = [];
+            particles = [];
+
+            player.reset();
+            initBackground();
+
+            // Hide menus
+            document.getElementById('menu-start').classList.add('hidden');
+            document.getElementById('menu-gameover').classList.add('hidden');
+            document.getElementById('menu-pause').classList.add('hidden');
+            document.getElementById('hud-overlay').classList.remove('opacity-0');
+        }
+
+        // --- SHOP & CUSTOMIZATION LOGIC ---
+        function renderShop() {
+            document.getElementById('shop-orbs-count').textContent = totalOrbs;
+            const container = document.getElementById('shop-skins-list');
+            container.innerHTML = '';
+
+            SKINS.forEach(s => {
+                const isUnlocked = unlockedSkins.includes(s.id);
+                const isActive = activeSkin === s.id;
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border flex flex-col justify-between ${isActive ? 'bg-cyan-950/40 border-cyan-400 box-glow-cyan' : 'bg-slate-900 border-slate-800'}`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="h-16 rounded-lg mb-3 flex items-center justify-center" style="background: ${s.color}20; border: 1px solid ${s.color}">
+                            <div class="w-6 h-10 rounded" style="background: ${s.color}; box-shadow: 0 0 10px ${s.color}"></div>
+                        </div>
+                        <h4 class="font-orbitron font-bold text-sm text-white mb-1">${s.name}</h4>
+                    </div>
+                    <div class="mt-4">
+                        ${isActive ? 
+                            `<span class="text-xs text-cyan-400 font-orbitron font-bold"><i class="fa-solid fa-check mr-1"></i> EQUIPPED</span>` :
+                            (isUnlocked ? 
+                                `<button onclick="equipSkin('${s.id}')" class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-orbitron font-bold text-white rounded-lg">EQUIP</button>` :
+                                `<button onclick="buySkin('${s.id}')" class="w-full py-1.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-xs font-orbitron font-bold text-slate-950 rounded-lg flex items-center justify-center gap-1">
+                                    <i class="fa-solid fa-bolt"></i> BUY (${s.price})
+                                </button>`
+                            )
+                        }
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.equipSkin = function(skinId) {
+            activeSkin = skinId;
+            localStorage.setItem('cyber_skin', activeSkin);
+            renderShop();
+        };
+
+        window.buySkin = function(skinId) {
+            const skin = SKINS.find(s => s.id === skinId);
+            if (skin && totalOrbs >= skin.price) {
+                totalOrbs -= skin.price;
+                unlockedSkins.push(skinId);
+                localStorage.setItem('cyber_orbs', totalOrbs);
+                localStorage.setItem('cyber_unlocked_skins', JSON.stringify(unlockedSkins));
+                equipSkin(skinId);
+            }
+        };
+
+        // --- CONTROLS & INPUT HANDLERS ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+                if (gameState === 'PLAYING') player.jump();
+            } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                if (gameState === 'PLAYING') player.startSlide();
+            } else if (e.code === 'KeyP' || e.code === 'Escape') {
+                if (gameState === 'PLAYING') {
+                    gameState = 'PAUSED';
+                    document.getElementById('menu-pause').classList.remove('hidden');
+                } else if (gameState === 'PAUSED') {
+                    gameState = 'PLAYING';
+                    document.getElementById('menu-pause').classList.add('hidden');
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                if (gameState === 'PLAYING') player.stopSlide();
+            }
+        });
+
+        // Touch Control Listeners
+        const touchJumpBtn = document.getElementById('touch-jump');
+        const touchSlideBtn = document.getElementById('touch-slide');
+
+        touchJumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') player.jump();
+        });
+
+        touchSlideBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') player.startSlide();
+        });
+
+        touchSlideBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') player.stopSlide();
+        });
+
+        // UI Event Listeners
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            gameState = 'PAUSED';
+            document.getElementById('menu-pause').classList.remove('hidden');
+        });
+        document.getElementById('btn-resume').addEventListener('click', () => {
+            gameState = 'PLAYING';
+            document.getElementById('menu-pause').classList.add('hidden');
+        });
+        document.getElementById('btn-quit').addEventListener('click', () => {
+            gameState = 'START';
+            document.getElementById('menu-pause').classList.add('hidden');
+            document.getElementById('hud-overlay').classList.add('opacity-0');
+            document.getElementById('menu-start').classList.remove('hidden');
+        });
+        document.getElementById('btn-menu-go').addEventListener('click', () => {
+            gameState = 'START';
+            document.getElementById('menu-gameover').classList.add('hidden');
+            document.getElementById('menu-start').classList.remove('hidden');
+        });
+
+        document.getElementById('btn-shop').addEventListener('click', () => {
+            renderShop();
+            document.getElementById('menu-shop').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-shop').addEventListener('click', () => {
+            document.getElementById('menu-shop').classList.add('hidden');
+            updateHUD();
+        });
+
+        // Sound Toggle
+        document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+            SoundFX.enabled = !SoundFX.enabled;
+            const icon = document.getElementById('sound-icon');
+            icon.className = SoundFX.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark text-rose-500';
+        });
+
+        // Initialize Engine
+        window.onload = () => {
+            resizeCanvas();
+            initBackground();
+            updateHUD();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
